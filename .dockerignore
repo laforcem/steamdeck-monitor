@@ -1,0 +1,6 @@
+.git
+.github
+.superpowers
+docs
+tests
+__pycache__
