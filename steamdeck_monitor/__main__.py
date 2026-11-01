@@ -6,7 +6,7 @@ import signal
 import sys
 import time
 
-from .config import load_config
+from .config import LOG_LEVELS, load_config
 from .crosscheck import CrossChecker, fetch_status
 from .http import Http, HttpError
 from .monitor import Monitor
@@ -15,7 +15,7 @@ from .telegram import Outbox, Telegram
 
 log = logging.getLogger("steamdeck-monitor")
 
-EX_CONFIG = 78  # systemd/docker restart policies shouldn't loop on this
+EX_CONFIG = 78  # sysexits EX_CONFIG. Docker restart policies still restart on it.
 JITTER = 5
 
 
@@ -58,7 +58,7 @@ def run(cfg, http, telegram, sleep, clock, max_iterations=None):
                 theirs = fetch_status(http, cfg.country, now)
                 for text in crosscheck.compare(result.states, theirs, now):
                     outbox.add(text)
-            outbox.flush(telegram.send)
+            outbox.flush(telegram.deliver)
         except Exception as e:  # noqa: BLE001 -- the loop must survive anything
             # Class name only: exception text could carry a URL or token.
             log.error("Unexpected %s in loop iteration; carrying on",
@@ -82,8 +82,9 @@ def main(argv=None, env=os.environ, http=None):
                         help="send one test message and exit")
     args = parser.parse_args(argv)
 
+    level = (env.get("LOG_LEVEL") or "INFO").upper()
     logging.basicConfig(
-        level=(env.get("LOG_LEVEL") or "INFO").upper(), stream=sys.stdout,
+        level=level if level in LOG_LEVELS else "INFO", stream=sys.stdout,
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S")
     try:
@@ -113,9 +114,13 @@ def main(argv=None, env=os.environ, http=None):
         print("Telegram test:", "OK" if ok else "FAILED (see log above)")
         return 0 if ok else 1
 
-    if not telegram.get_me():
+    status = telegram.get_me()
+    if status == "rejected":
         log.critical("Telegram rejected the bot token (check TELEGRAM_BOT_TOKEN).")
         return EX_CONFIG
+    if status == "unreachable":
+        log.critical("Could not reach Telegram; exiting so the restart policy retries.")
+        return 1
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:

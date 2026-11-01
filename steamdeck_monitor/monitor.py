@@ -38,7 +38,8 @@ class Monitor:
     def next_delay(self):
         # Exponent capped: 2**1024+ would overflow the float multiply.
         streak = min(self._rate_limited_streak, 10)
-        return min(self.check_interval * 2 ** streak, MAX_BACKOFF)
+        backoff = min(self.check_interval * 2 ** streak, MAX_BACKOFF)
+        return max(self.check_interval, backoff)
 
     def _apply_states(self, states, now):
         msgs = []
@@ -52,14 +53,15 @@ class Monitor:
                 self._in_since[pid] = now
                 if model:
                     msgs.append(messages.in_stock(model, now))
-            elif prev and not new and model:
-                msgs.append(messages.sold_out(
-                    model, now, now - self._in_since.pop(pid, now)))
+            elif prev and not new:
+                since = self._in_since.pop(pid, now)
+                if model:
+                    msgs.append(messages.sold_out(model, now, now - since))
             self.states[pid] = new
         return msgs
 
     def _on_success(self, now):
-        msgs = [messages.fault_recovered()] if self._fault_sent else []
+        msgs = [messages.fault_recovered(now)] if self._fault_sent else []
         self._last_success = now
         self._failures = {"rate_limited": 0, "failed": 0}
         self._fault_sent = False

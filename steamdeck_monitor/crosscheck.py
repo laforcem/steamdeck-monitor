@@ -1,6 +1,5 @@
-import calendar
 import json
-import time
+from datetime import datetime, timezone
 
 from . import messages
 from .http import HttpError
@@ -19,8 +18,10 @@ def parse_status(body, country, now):
     """{package id: in stock?} from steamhardwarestock, or None if unusable."""
     try:
         doc = json.loads(body)
-        generated = calendar.timegm(
-            time.strptime(doc["generatedAt"][:19], "%Y-%m-%dT%H:%M:%S"))
+        stamp = datetime.fromisoformat(doc["generatedAt"].replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        generated = stamp.timestamp()
         if now - generated > MAX_AGE:
             return None
         found = {}
@@ -44,7 +45,7 @@ def fetch_status(http, country, now):
 class CrossChecker:
     def __init__(self, start):
         self._streak = {}
-        self._alerted = False
+        self._alerted = set()  # confirmed-mismatch ids already reported
         self._down_since = None
         self._down_alerted = False
 
@@ -53,7 +54,7 @@ class CrossChecker:
             return self._unavailable(now)
         msgs = []
         if self._down_alerted:
-            msgs.append(messages.crosscheck_up())
+            msgs.append(messages.crosscheck_up(now))
         self._down_since, self._down_alerted = None, False
 
         mismatched = {pid for pid, ours_ in ours.items()
@@ -61,13 +62,12 @@ class CrossChecker:
         self._streak = {pid: self._streak.get(pid, 0) + 1 for pid in mismatched}
         confirmed = sorted(pid for pid, n in self._streak.items()
                            if n >= CONFIRM_READS)
-        if confirmed and not self._alerted:
-            self._alerted = True
+        if set(confirmed) - self._alerted:  # something not yet reported
             msgs.append(messages.out_of_sync(
                 [(_BY_ID[pid], ours[pid], theirs[pid]) for pid in confirmed]))
         elif self._alerted and not mismatched:
-            self._alerted = False
-            msgs.append(messages.in_sync())
+            msgs.append(messages.in_sync(now))
+        self._alerted = set(confirmed)
         return msgs
 
     def _unavailable(self, now):

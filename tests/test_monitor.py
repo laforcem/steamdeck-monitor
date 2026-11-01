@@ -1,3 +1,4 @@
+import re
 import unittest
 
 from fakes import detail, steam_response  # noqa: F401  (shared helpers)
@@ -143,3 +144,21 @@ class BackoffTest(unittest.TestCase):
         for n in range(2000):
             m.on_poll(failed("rate_limited"), n)
         self.assertEqual(m.next_delay(), 1800)
+
+
+class MinorsTest(unittest.TestCase):
+    def test_check_interval_above_backoff_cap_is_kept(self):
+        self.assertEqual(Monitor(WATCH, 3600.0, start=0).next_delay(), 3600)
+
+    def test_recovery_message_has_timestamp(self):
+        m = monitor()
+        for t in range(0, 31 * 60, 60):
+            m.on_poll(failed(), t)
+        back = m.on_poll(ok(), 32 * 60)
+        self.assertRegex(back[0], r"\d{4}-\d\d-\d\d \d\d:\d\d")
+
+    def test_unwatched_in_since_is_cleared(self):
+        m = monitor()
+        m.on_poll(ok(**{f"p{DOCK}": True}), 0)
+        m.on_poll(ok(), 60)
+        self.assertEqual(m._in_since, {})

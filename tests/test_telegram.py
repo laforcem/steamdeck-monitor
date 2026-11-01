@@ -73,12 +73,34 @@ class TelegramTest(unittest.TestCase):
         self.assertTrue(logs.records)
         self.assertNotIn("SECRET", "\n".join(r.getMessage() for r in logs.records))
 
-    def test_get_me(self):
+    def test_get_me_ok(self):
         t, http, _ = tg([ok_response()])
-        self.assertTrue(t.get_me())
+        self.assertEqual(t.get_me(), "ok")
         self.assertTrue(http.calls[0][1].endswith("/getMe"))
+
+    def test_get_me_rejected_token(self):
         t, _, _ = tg([Response(401, {}, b"")])
-        self.assertFalse(t.get_me())
+        self.assertEqual(t.get_me(), "rejected")
+
+    def test_get_me_unreachable(self):
+        for item in (HttpError("URLError"), Response(500, {}, b""),
+                     Response(429, {}, b"")):
+            t, _, _ = tg([item])
+            self.assertEqual(t.get_me(), "unreachable", item)
+
+    def test_deliver_drops_message_rejected_with_400(self):
+        t, http, _ = tg([Response(400, {}, b'{"description": "bad html"}')])
+        with self.assertLogs("steamdeck-monitor", level="ERROR"):
+            self.assertTrue(t.deliver("<b>broken"))
+        self.assertEqual(len(http.calls), 1)
+
+    def test_deliver_keeps_message_on_transient_failure(self):
+        t, _, _ = tg([Response(500, {}, b"")] * 3)
+        self.assertFalse(t.deliver("x"))
+
+    def test_deliver_keeps_message_on_auth_failure(self):
+        t, _, _ = tg([Response(401, {}, b"")])
+        self.assertFalse(t.deliver("x"))
 
 
 class OutboxTest(unittest.TestCase):

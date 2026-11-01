@@ -9,12 +9,12 @@ Python 3 standard library only.
 ## Run
 
 ```sh
-docker run --rm ghcr.io/laforcem/steamdeck-monitor:v0.1.0 --once          # one check, no Telegram needed
+docker run --rm ghcr.io/laforcem/steamdeck-monitor:v0.1.1 --once          # one check, no Telegram needed
 docker run --rm -e TELEGRAM_BOT_TOKEN=... -e TELEGRAM_CHAT_ID=... \
-  ghcr.io/laforcem/steamdeck-monitor:v0.1.0 --test-telegram                # send a test message
+  ghcr.io/laforcem/steamdeck-monitor:v0.1.1 --test-telegram                # send a test message
 ```
 
-Without flags it runs forever. Exit code 78 means bad configuration (the container shouldn't restart-loop on it).
+Without flags it runs forever. Exit code 78 means bad configuration, exit code 1 means Telegram was unreachable at startup. Docker restart policies restart on any non-zero exit, so with `restart: always` either one retries until fixed.
 
 ## Configuration
 

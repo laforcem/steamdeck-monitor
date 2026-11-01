@@ -70,6 +70,14 @@ class MainTest(unittest.TestCase):
         code, _ = self.run_main([], ENV, http)
         self.assertEqual(code, 78)
 
+    def test_unreachable_telegram_exits_1(self):
+        code, _ = self.run_main([], ENV, FakeHttp([HttpError("URLError")]))
+        self.assertEqual(code, 1)
+
+    def test_invalid_log_level_exits_78(self):
+        code, _ = self.run_main(["--once"], {"LOG_LEVEL": "loud"}, FakeHttp([]))
+        self.assertEqual(code, 78)
+
     def test_test_telegram_sends_one_message(self):
         http = FakeHttp([TG_OK])
         code, _ = self.run_main(["--test-telegram"], ENV, http)
@@ -139,3 +147,9 @@ class LoopTest(unittest.TestCase):
         with self.assertLogs("steamdeck-monitor", level="WARNING") as logs:
             run_iterations(http, 1)
         self.assertIn("404", "\n".join(r.getMessage() for r in logs.records))
+
+    def test_rejected_message_does_not_block_outbox(self):
+        http = Router({STEAM: [stock(oled=True, tb=True)],
+                       TELEGRAM: [Response(400, {}, b""), TG_OK], HC: [TG_OK]})
+        run_iterations(http, 1)
+        self.assertEqual(http.count(TELEGRAM), 2)
