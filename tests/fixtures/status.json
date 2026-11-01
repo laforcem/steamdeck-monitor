@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-10-31T23:30:39.886Z",
+  "products": {
+    "steam-deck-refurbished": {
+      "US": {
+        "status": "out_of_stock",
+        "packages": [
+          {
+            "id": 903905,
+            "status": "out_of_stock"
+          },
+          {
+            "id": 903906,
+            "status": "out_of_stock"
+          },
+          {
+            "id": 903907,
+            "status": "out_of_stock"
+          },
+          {
+            "id": 1202542,
+            "status": "out_of_stock"
+          },
+          {
+            "id": 1202547,
+            "status": "out_of_stock"
+          }
+        ]
+      }
+    },
+    "steam-dock": {
+      "US": {
+        "status": "out_of_stock",
+        "packages": [
+          {
+            "id": 761892,
+            "status": "out_of_stock"
+          }
+        ]
+      }
+    }
+  }
+}
