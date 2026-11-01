@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from .models import Model, parse_watch
 
 MIN_CHECK_INTERVAL = 30
+LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 @dataclass
@@ -32,6 +33,9 @@ def _number(env, name, default):
 
 
 def load_config(env):
+    log_level = (env.get("LOG_LEVEL") or "INFO").upper()
+    if log_level not in LOG_LEVELS:
+        raise ValueError(f"LOG_LEVEL must be one of {', '.join(sorted(LOG_LEVELS))}")
     return Config(
         token=_secret(env, "TELEGRAM_BOT_TOKEN"),
         chat_id=_secret(env, "TELEGRAM_CHAT_ID"),
@@ -41,5 +45,5 @@ def load_config(env):
         check_interval=max(MIN_CHECK_INTERVAL,
                            _number(env, "CHECK_INTERVAL", 60)),
         crosscheck_interval=max(0.0, _number(env, "CROSSCHECK_INTERVAL", 900)),
-        log_level=(env.get("LOG_LEVEL") or "INFO").upper(),
+        log_level=log_level,
     )

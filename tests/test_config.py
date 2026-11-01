@@ -44,3 +44,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_country_uppercased(self):
         self.assertEqual(load_config({"COUNTRY_CODE": "us"}).country, "US")
+
+    def test_invalid_log_level_raises(self):
+        with self.assertRaises(ValueError):
+            load_config({"LOG_LEVEL": "loud"})

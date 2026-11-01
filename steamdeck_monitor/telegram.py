@@ -19,6 +19,7 @@ class Telegram:
         self._token = token
         self._chat_id = chat_id
         self._sleep = sleep
+        self._last_status = None
 
     def _url(self, method):
         return f"{API}/bot{self._token}/{method}"
@@ -27,14 +28,27 @@ class Telegram:
         return str(text).replace(self._token, "<token>")
 
     def get_me(self):
+        """"ok", "rejected" (bad token) or "unreachable" (network / Telegram down)."""
         try:
             resp = self._http.request("GET", self._url("getMe"))
         except HttpError as e:
             log.error("Telegram getMe failed: %s", self._safe(e))
-            return False
-        if resp.status != 200:
-            log.error("Telegram getMe returned HTTP %s", resp.status)
-        return resp.status == 200
+            return "unreachable"
+        if resp.status == 200:
+            return "ok"
+        log.error("Telegram getMe returned HTTP %s", resp.status)
+        return "unreachable" if resp.status == 429 or resp.status >= 500 else "rejected"
+
+    def deliver(self, text):
+        """send(), but a message Telegram rejects outright (HTTP 400) counts as
+        handled so it can't block the outbox forever. Auth failures and outages
+        keep the message queued."""
+        if self.send(text):
+            return True
+        if self._last_status == 400:
+            log.error("Telegram rejected a message (HTTP 400); dropping it")
+            return True
+        return False
 
     def send(self, text):
         """Send one message. Returns True on success; never raises."""
@@ -52,6 +66,7 @@ class Telegram:
                 log.error("Telegram send failed (attempt %d): %s",
                           attempt + 1, self._safe(e))
                 resp = None
+            self._last_status = resp.status if resp is not None else None
             if resp is not None:
                 if resp.status == 200:
                     return True

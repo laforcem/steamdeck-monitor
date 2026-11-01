@@ -122,3 +122,32 @@ class CrossCheckerTest(unittest.TestCase):
             sent += c.compare(agree(), None, t)
         sent += c.compare(agree(), agree(), 2 * 3600)
         self.assertEqual(sent, [])
+
+    def test_recovery_messages_have_timestamps(self):
+        c = CrossChecker(0)
+        ours = agree(**{f"p{OLED}": True})
+        c.compare(ours, agree(), 0)
+        c.compare(ours, agree(), 900)
+        in_sync = c.compare(agree(), agree(), 1800)[0]
+        d = CrossChecker(0)
+        for t in range(0, 25 * 3600, 900):
+            d.compare(agree(), None, t)
+        up = d.compare(agree(), agree(), 25 * 3600)[0]
+        for text in (in_sync, up):
+            self.assertRegex(text, r"\d{4}-\d\d-\d\d \d\d:\d\d")
+
+    def test_new_mismatch_after_partial_recovery_realerts(self):
+        c = CrossChecker(0)
+        a = agree(**{f"p{OLED}": True})
+        b = agree(**{"p1202547": True})
+        c.compare(a, agree(), 0)
+        self.assertEqual(len(c.compare(a, agree(), 900)), 1)   # A confirmed
+        self.assertEqual(c.compare(b, agree(), 1800), [])      # A fixed, B first miss
+        second = c.compare(b, agree(), 2700)                   # B confirmed
+        self.assertEqual(len(second), 1)
+        self.assertIn("1 TB OLED", second[0])
+
+    def test_parse_honours_timezone_offset(self):
+        local = body(generatedAt="2026-10-31T17:30:39.886-06:00")  # = 23:30:39Z
+        self.assertIsNotNone(parse_status(local, "US", GENERATED + 60))
+        self.assertIsNone(parse_status(local, "US", GENERATED + 31 * 60))

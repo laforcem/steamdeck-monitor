@@ -30,8 +30,8 @@ def fault(label, since):
             "Still retrying. Stock alerts may be missing until this clears.")
 
 
-def fault_recovered():
-    return f"{RECOVERY} Steam checks are working again."
+def fault_recovered(at):
+    return f"{RECOVERY} Steam checks are working again (as of {_ts(at)})."
 
 
 def _word(in_stock_):
@@ -47,8 +47,8 @@ def out_of_sync(rows):
     return "\n".join(lines)
 
 
-def in_sync():
-    return f"{RECOVERY} Steam and steamhardwarestock agree again."
+def in_sync(at):
+    return f"{RECOVERY} Steam and steamhardwarestock agree again (as of {_ts(at)})."
 
 
 def crosscheck_down(since):
@@ -56,5 +56,6 @@ def crosscheck_down(since):
             f"since {_ts(since)}. Stock alerts are unaffected.")
 
 
-def crosscheck_up():
-    return f"{RECOVERY} the steamhardwarestock cross-check is available again."
+def crosscheck_up(at):
+    return (f"{RECOVERY} the steamhardwarestock cross-check is available again "
+            f"(as of {_ts(at)}).")
