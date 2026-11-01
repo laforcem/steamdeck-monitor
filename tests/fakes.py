@@ -33,3 +33,24 @@ def detail(package_id, inventory=True, allowed=True, reservation=False,
 def steam_response(details, status=200, headers=None):
     body = json.dumps({"response": {"details": details}}).encode()
     return Response(status, {"x-eresult": "1", **(headers or {})}, body)
+
+
+class Router:
+    """Routes requests by URL prefix to per-prefix queues of responses."""
+
+    def __init__(self, routes):
+        self.routes = {prefix: list(items) for prefix, items in routes.items()}
+        self.calls = []
+
+    def request(self, method, url, data=None, timeout=10):
+        self.calls.append((method, url, data))
+        for prefix, queue in self.routes.items():
+            if url.startswith(prefix):
+                item = queue.pop(0)
+                if isinstance(item, Exception):
+                    raise item
+                return item
+        raise AssertionError(f"unrouted request: {method} {url}")
+
+    def count(self, prefix):
+        return sum(1 for _, url, _ in self.calls if url.startswith(prefix))
