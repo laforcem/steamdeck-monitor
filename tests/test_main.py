@@ -3,7 +3,7 @@ import io
 import unittest
 from unittest import mock
 
-from fakes import FakeHttp, Router, detail, steam_response
+from fakes import FakeHttp, Router, detail, shs_response, steam_response
 from steamdeck_monitor.__main__ import main, run
 from steamdeck_monitor.config import load_config
 from steamdeck_monitor.http import HttpError, Response
@@ -118,3 +118,24 @@ class LoopTest(unittest.TestCase):
                        HC: [TG_OK, TG_OK]})
         run_iterations(http, 2)
         self.assertEqual(http.count(TELEGRAM), 4)
+
+    def test_unexpected_error_does_not_kill_loop(self):
+        http = Router({STEAM: [RuntimeError("boom"), stock()], HC: [TG_OK, TG_OK]})
+        run_iterations(http, 2)
+        self.assertEqual(http.count(STEAM), 2)
+        self.assertEqual(http.count(HC), 2)
+
+    def test_no_crosscheck_alert_while_steam_is_down(self):
+        # One mismatch is recorded while Steam works; later reads happen while
+        # Steam is failing and must not complete the two-read confirmation.
+        http = Router({
+            STEAM: [stock(oled=True)] + [Response(500, {}, b"")] * 2,
+            SHS: [shs_response()] * 3, TELEGRAM: [TG_OK] * 3, HC: [TG_OK] * 3})
+        run_iterations(http, 3, CROSSCHECK_INTERVAL="1")
+        self.assertEqual(http.count(TELEGRAM), 1)  # only the IN STOCK alert
+
+    def test_non_200_ping_is_logged(self):
+        http = Router({STEAM: [stock()], HC: [Response(404, {}, b"")]})
+        with self.assertLogs("steamdeck-monitor", level="WARNING") as logs:
+            run_iterations(http, 1)
+        self.assertIn("404", "\n".join(r.getMessage() for r in logs.records))

@@ -1,4 +1,5 @@
 import json
+import os
 
 from steamdeck_monitor.http import Response
 
@@ -54,3 +55,10 @@ class Router:
 
     def count(self, prefix):
         return sum(1 for _, url, _ in self.calls if url.startswith(prefix))
+
+
+def shs_response():
+    """steamhardwarestock status.json (everything out of stock)."""
+    path = os.path.join(os.path.dirname(__file__), "fixtures", "status.json")
+    with open(path, "rb") as f:
+        return Response(200, {}, f.read())

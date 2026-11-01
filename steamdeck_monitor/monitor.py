@@ -36,8 +36,9 @@ class Monitor:
         return msgs
 
     def next_delay(self):
-        return min(self.check_interval * 2 ** self._rate_limited_streak,
-                   MAX_BACKOFF)
+        # Exponent capped: 2**1024+ would overflow the float multiply.
+        streak = min(self._rate_limited_streak, 10)
+        return min(self.check_interval * 2 ** streak, MAX_BACKOFF)
 
     def _apply_states(self, states, now):
         msgs = []

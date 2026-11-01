@@ -82,3 +82,7 @@ class SteamTest(unittest.TestCase):
     def test_transport_error_is_failed(self):
         r = poll(FakeHttp([HttpError("URLError")]), "US")
         self.assertEqual(r.kind, "failed")
+
+    def test_unhashable_packageid_is_failure(self):
+        r = poll(FakeHttp([steam_response([{"packageid": [1]}])]), "US")
+        self.assertEqual(r.kind, "failed")

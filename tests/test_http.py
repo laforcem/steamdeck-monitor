@@ -24,3 +24,17 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(resp.status, 404)
         self.assertEqual(resp.body, b"nope")
         self.assertEqual(resp.headers["x-eresult"], "9")
+
+    def test_unreadable_error_body_is_still_a_response(self):
+        class BadFp:
+            def read(self, *a):
+                raise OSError("timed out")
+
+            def close(self):
+                pass
+
+        err = urllib.error.HTTPError("u", 500, "boom", {}, BadFp())
+        with mock.patch("urllib.request.urlopen", side_effect=err):
+            resp = Http().request("GET", "https://example.test/")
+        self.assertEqual(resp.status, 500)
+        self.assertEqual(resp.body, b"")

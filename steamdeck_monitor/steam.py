@@ -54,9 +54,9 @@ def poll(http, country):
         details = json.loads(resp.body)["response"]["details"]
         if not isinstance(details, list):
             raise TypeError("details is not a list")
+        by_id = {d.get("packageid"): d for d in details if isinstance(d, dict)}
     except (ValueError, KeyError, TypeError):
         return _failed("bad JSON")
-    by_id = {d.get("packageid"): d for d in details if isinstance(d, dict)}
     states = {pid: classify(by_id[pid]) if pid in by_id else None
               for pid in ALL_PACKAGE_IDS}
     return PollResult("ok", states)

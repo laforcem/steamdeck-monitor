@@ -137,3 +137,9 @@ class BackoffTest(unittest.TestCase):
 
     def test_normal_delay_is_check_interval(self):
         self.assertEqual(monitor().next_delay(), 60)
+
+    def test_long_rate_limit_streak_does_not_overflow(self):
+        m = Monitor(WATCH, 60.0, start=0)  # config yields floats
+        for n in range(2000):
+            m.on_poll(failed("rate_limited"), n)
+        self.assertEqual(m.next_delay(), 1800)

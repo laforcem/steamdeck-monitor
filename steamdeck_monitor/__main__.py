@@ -25,9 +25,13 @@ def _word(state):
 
 def _ping(http, url):
     try:
-        http.request("GET", url, timeout=10)
+        resp = http.request("GET", url, timeout=10)
     except HttpError as e:
         log.warning("Healthchecks ping failed: %s", e)
+        return
+    if resp.status != 200:
+        log.warning("Healthchecks ping returned HTTP %s (is the URL right?)",
+                    resp.status)
 
 
 def run(cfg, http, telegram, sleep, clock, max_iterations=None):
@@ -42,14 +46,23 @@ def run(cfg, http, telegram, sleep, clock, max_iterations=None):
     iteration = 0
     while True:
         now = clock()
-        for text in monitor.on_poll(poll(http, cfg.country), now):
-            outbox.add(text)
-        if cfg.crosscheck_interval > 0 and now >= next_crosscheck:
-            next_crosscheck = now + cfg.crosscheck_interval
-            theirs = fetch_status(http, cfg.country, now)
-            for text in crosscheck.compare(monitor.states, theirs, now):
+        try:
+            result = poll(http, cfg.country)
+            for text in monitor.on_poll(result, now):
                 outbox.add(text)
-        outbox.flush(telegram.send)
+            # Only compare against a fresh, good Steam answer: stale state
+            # during a Steam outage would raise a second, misleading alert.
+            if (result.kind == "ok" and cfg.crosscheck_interval > 0
+                    and now >= next_crosscheck):
+                next_crosscheck = now + cfg.crosscheck_interval
+                theirs = fetch_status(http, cfg.country, now)
+                for text in crosscheck.compare(result.states, theirs, now):
+                    outbox.add(text)
+            outbox.flush(telegram.send)
+        except Exception as e:  # noqa: BLE001 -- the loop must survive anything
+            # Class name only: exception text could carry a URL or token.
+            log.error("Unexpected %s in loop iteration; carrying on",
+                      type(e).__name__)
         if cfg.hc_url:
             _ping(http, cfg.hc_url)
 

@@ -35,7 +35,11 @@ class Http:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 return Response(resp.status, _headers(resp.headers), resp.read())
         except urllib.error.HTTPError as e:
-            return Response(e.code, _headers(e.headers), e.read())
+            try:
+                body = e.read()
+            except Exception:  # noqa: BLE001 -- the status is what matters
+                body = b""
+            return Response(e.code, _headers(e.headers), body)
         except Exception as e:  # noqa: BLE001 -- anything else is transport
             reason = _URL.sub("<url>", str(getattr(e, "reason", "") or ""))
             raise HttpError(f"{type(e).__name__}: {reason}".rstrip(": ")) from None
